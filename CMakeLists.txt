@@ -10,7 +10,7 @@ list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 # System
 #############
 
-set(MONERO_CPP "${CMAKE_SOURCE_DIR}/monero-cpp")
+set(MONERO_CPP "${CMAKE_SOURCE_DIR}/external/monero-cpp")
 message(STATUS MONERO_CPP : ${MONERO_CPP} : ${MONERO_CPP})
 
 set(MONERO_CPP_SRC "${MONERO_CPP}/src")
