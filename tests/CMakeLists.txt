@@ -1,0 +1,2 @@
+add_executable(tests unit_tests.cpp catch.hpp ../multisweeper.cpp ../multisweeper.hpp)
+target_link_libraries(tests wallet_merged wallet_crypto wallet lmdb epee unbound easylogging cryptonote_core cryptonote_basic cryptonote_format_utils_basic mnemonics ringct ringct_basic common cncrypto blockchain_db blocks checkpoints device device_trezor multisig version randomx ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${SODIUM_LIBRARY} ${HIDAPI_LIBRARIES} ${EXTRA_LIBRARIES})

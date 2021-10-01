@@ -9,12 +9,15 @@ list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 #############
 # System
 #############
+
 set(MONERO_CPP "${CMAKE_SOURCE_DIR}/monero-cpp")
 message(STATUS MONERO_CPP : ${MONERO_CPP} : ${MONERO_CPP})
 
 set(MONERO_CPP_SRC "${MONERO_CPP}/src")
 set(MONERO_PROJECT ${MONERO_CPP}/external/monero-project)
 set(MONERO_PROJECT_SRC "${MONERO_PROJECT}/src")
+
+include_directories(includes)
 
 # monero-project header includes
 include_directories("${MONERO_CPP}/external/libsodium/include/sodium")
@@ -171,6 +174,10 @@ add_library(monero-cpp SHARED IMPORTED)
 # import shared c++ library
 set_target_properties(monero-cpp PROPERTIES IMPORTED_LOCATION ./libmonero-cpp.so)
 set(MONERO_CPP_SRC_FILES ${MONERO_CPP}/src/utils/gen_utils.cpp ${MONERO_CPP}/src/utils/monero_utils.cpp ${MONERO_CPP}/src/daemon/monero_daemon_model.cpp ${MONERO_CPP}/src/daemon/monero_daemon.cpp ${MONERO_CPP}/src/wallet/monero_wallet_model.cpp ${MONERO_CPP}/src/wallet/monero_wallet_keys.cpp ${MONERO_CPP}/src/wallet/monero_wallet_full.cpp )
+set(MONERO_CPP_HEADER_FILES ${MONERO_CPP}/src/daemon/monero_daemon.h ${MONERO_CPP}/src/daemon/monero_daemon_model.h ${MONERO_CPP}/src/utils/gen_utils.h ${MONERO_CPP}/src/utils/monero_utils.h ${MONERO_CPP}/src/wallet/monero_wallet.h )
 
-add_executable(multisweeper ${MONERO_CPP_SRC_FILES} main.cpp)
-target_link_libraries(multisweeper wallet_merged wallet_crypto wallet lmdb epee unbound easylogging cryptonote_core cryptonote_basic cryptonote_format_utils_basic mnemonics ringct ringct_basic common cncrypto blockchain_db blocks checkpoints device device_trezor multisig version randomx ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${SODIUM_LIBRARY} ${HIDAPI_LIBRARIES} ${EXTRA_LIBRARIES})
+add_library(sweeper_lib ${MONERO_CPP_SRC_FILES} ${MONERO_CPP_HEADER_FILES} multisweeper.cpp multisweeper.hpp)
+add_executable(multisweeper ${MONERO_CPP_SRC_FILES} ${MONERO_CPP_HEADER_FILES} main.cpp multisweeper.cpp multisweeper.hpp)
+target_link_libraries(multisweeper wallet_merged wallet_crypto wallet lmdb epee unbound easylogging cryptonote_core cryptonote_basic cryptonote_format_utils_basic mnemonics ringct ringct_basic common cncrypto blockchain_db blocks checkpoints device device_trezor multisig version randomx ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${SODIUM_LIBRARY} ${HIDAPI_LIBRARIES} ${EXTRA_LIBRARIES} sweeper_lib)
+
+add_subdirectory(tests)
