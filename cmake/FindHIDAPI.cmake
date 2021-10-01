@@ -23,19 +23,11 @@
 # (See accompanying file LICENSE_1_0.txt or copy at
 # http://www.boost.org/LICENSE_1_0.txt)
 
-find_library(HIDAPI_LIBRARY
-  NAMES hidapi hidapi-libusb)
-
-find_path(HIDAPI_INCLUDE_DIR
-  NAMES hidapi.h
-  PATH_SUFFIXES
-  hidapi)
+find_library(HIDAPI_LIBRARY NAMES hidapi hidapi-libusb)
+find_path(HIDAPI_INCLUDE_DIR NAMES hidapi.h PATH_SUFFIXES hidapi)
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(HIDAPI
-  DEFAULT_MSG
-  HIDAPI_LIBRARY
-  HIDAPI_INCLUDE_DIR)
+find_package_handle_standard_args(HIDAPI DEFAULT_MSG HIDAPI_LIBRARY HIDAPI_INCLUDE_DIR)
 
 if(HIDAPI_FOUND)
   set(HIDAPI_LIBRARIES "${HIDAPI_LIBRARY}")
@@ -53,7 +45,6 @@ if(HIDAPI_FOUND)
       message(WARNING "libusb-1.0 library not found, binaries may fail to link.")
     endif()
   endif()
-
   set(HIDAPI_INCLUDE_DIRS "${HIDAPI_INCLUDE_DIR}")
 endif()
 
