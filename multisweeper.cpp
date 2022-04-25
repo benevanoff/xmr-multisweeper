@@ -31,134 +31,100 @@
 #include <iostream>
 #include "multisweeper.hpp"
 #include "mnemonics/electrum-words.h"
-#include "wallet2.h"
-#include "daemon/monero_daemon_model.h"
-#include "wallet/monero_wallet.h"
-#include "wallet/monero_wallet_full.h"
-#include "utils/monero_utils.h"
 
-using namespace std;
-
-/*
- * hex_str_to_secret_key
- * convert a std::string to a crypto::secret_key
- * @param key - the key to convert in string form
- * @return the key reinterpreted as a crypto::secret_key
- * 
- */
-crypto::secret_key hex_str_to_secret_key(std::string key) {
-  cryptonote::blobdata buff;
-  if(!epee::string_tools::parse_hexstr_to_binbuff(key, buff))
-      cerr << "failed to parse " << key << " to type crypto::secret_key" << endl; 
-    return *reinterpret_cast<const crypto::secret_key*>(buff.data());
-}
-
-/*
- * remove_comma
- * mutate string to remove (the first) comma
- * @param str - the string the modify
- * @return true on success false if fail (including no comma present)
- */
-bool remove_comma(std::string& str) {
-  std::string::size_type pos = str.find(',');
-  if (pos == std::string::npos)
-    return false;
-  try {
-    str.erase(pos);
-  } catch (const exception& e) {
-    return false;
+std::vector<std::vector<crypto::secret_key>> Sweeper::partition_keyset(size_t groups) {
+  std::vector<std::vector<crypto::secret_key>> result;
+  if (groups < 2) {
+    result.push_back(keys_);
+    return result;
   }
-  return true;
+
+  size_t i = 0;
+  while (i < keys_.size()) {
+    size_t start = i;
+    size_t end = i+(groups-1) < keys_.size() ? i+(groups-1) : keys_.size()-1;
+    std::vector<crypto::secret_key> row = std::vector<crypto::secret_key>(keys_.begin()+start, keys_.begin()+end);
+    result.push_back(row);
+    i = end+1;
+  }
+  return result;
 }
 
-/* isValidHost - idk why i like this better than underscores >_<
- * check if this looks sorta like a proper host name with port
- * @param host name with port of monero node to connect to (eg 127.0.0.1:18081)
- * @return True conforms to convention (has ':' and '.') else False
- */
-bool isValidHost(std::string host) {
-  unsigned int period_count = 0;
-  for(size_t pos = host.find('.'); pos != std::string::npos; pos = host.find('.')) {
-    period_count++;
-    try {
-      host.erase(0, pos + 1);	
-    } catch (const std::out_of_range& oor) {
-      break;
-    } catch (const exception e) {
+bool scan_wallets(const std::string &host, const std::string &rec_addr, const std::vector<crypto::secret_key> &keys) {
+std::vector<std::string> files_created;
+  for (size_t i = 0; i < keys.size(); i++) {
+    crypto::secret_key sec_spendkey = keys[i];
+    if (sec_spendkey == crypto::null_skey)
+      return false;   
+    crypto::public_key pub_spendkey;
+    if(!crypto::secret_key_to_public_key(sec_spendkey, pub_spendkey)) {
+      std::cerr << "failed to calculate public spend key from private spend key" << std::endl;
       return false;
     }
-  }
-  if (period_count == 3)
-    return host.find(':') != std::string::npos;
-  return true;
-}
-
-/* 
- * process_args 
- * extract host and receiving_addr address from main arguments, erases them from argument vector
- * @param args - should be argv from main
- * @param host - the monero node to connect to formatted like 127.0.0.1:18081
- * @param receiving_addr - the address which will collect all the funds
- * @return True on success False if error
- */
-bool process_args(std::vector<std::string>& args, std::string& host, std::string& receiving_addr) {
-  const string usage = "usage: multisweeper [host], [Receiving address], [privatekey1], (privatekey2), (privatekeyn) ex: ./multisweeper 127.0.0.1 46YCMVGbdnfCoA7PammbanBtyaTzhLzgF3bEJAeybFQZ4aTZ4cu76KHKXe4Mft9yaodUBzs3HQpW23qmiJB2NZ714snYrAV, boss wedge inbound avoid enforce smelting entrance much salads icon yeti volcano nightly seismic gymnast avoid dewdrop deepest shipped nitrogen pizza ointment acoustic adventure adventure, 3dc0c516976cf04e8d71c24ef6a6e012e8489379c1e8b6b7077e9fdd805e6202";
-  
-  if (args.size() < 3) {
-    cout << usage << endl;
-    return false;
-  }
-  
-  remove_comma(args[0]);;
-  if(!isValidHost(args[0])) {
-    cerr << "invalid host" << endl;
-    return false;
-  }
-  args.erase(args.begin());
-  remove_comma(args[0]);
-  if (!monero_utils::is_valid_address(args[0], monero_network_type::MAINNET)) {
-    cerr << "invalid address" << endl;
-    cout << usage << endl;
-    return false;
-  }
-  receiving_addr = args[0];
-  args.erase(args.begin());
-  return true;
-}
-
-/*
- * get_keys_from_args
- * take vector of strings from main argv which should
- * encode secret spend keys either as hexadecimal or a 25 word mnemonic
- * @param args - is meant to be a subset of argv from main function through which
- * to search for private keys delimited by comma (,)
- * @return vector of secret keys passed as argument but now as crypto::secret_key
- */
-std::vector<crypto::secret_key> get_keys_from_args(const std::vector<std::string>& args) {
-  std::vector<crypto::secret_key> keys;
-  epee::wipeable_string current_mnemonic = "";
-  size_t current_mnemonic_word_count = 0;
-  for (std::string entry : args) {
-    bool delimiter_found = entry.find(',') != std::string::npos;
-    size_t entry_size = entry.size();
-    if (delimiter_found)
-      entry.erase(entry_size - 1);
     
-    if (entry.size() == 64) // 64 hex characters and a comma  
-	  keys.push_back(hex_str_to_secret_key(entry));
-	else { // process 25 word mnemonic seed
-      current_mnemonic += entry;
-      current_mnemonic_word_count++;
-      if (current_mnemonic_word_count < 25)
-        current_mnemonic += " ";
-      if (delimiter_found || current_mnemonic_word_count == 25) {
-        crypto::secret_key key;
-        std::string language;
-        if (!crypto::ElectrumWords::words_to_bytes(current_mnemonic, key, language))
-          throw std::runtime_error("Failed to decode mnemonic seed");
-        keys.push_back(key);
+    crypto::secret_key sec_viewkey;
+    crypto::hash_to_scalar(&sec_spendkey, sizeof(sec_spendkey), sec_viewkey);
+    crypto::public_key pub_viewkey;
+    if (!crypto::secret_key_to_public_key(sec_viewkey, pub_viewkey)) {
+      std::cerr << "failed to calculate public view key from derived private view key" << std::endl;
+      return false;
+    }
+    
+    cryptonote::account_public_address addr {pub_spendkey, pub_viewkey};
+    std::string addr_string = cryptonote::get_account_address_as_str(cryptonote::network_type::MAINNET, false, addr);
+    std::cout << "Loading wallet " << i+1 << std::endl;
+    std::string wallet_file_name = "wallet" + std::to_string(i+1);
+    files_created.push_back(wallet_file_name);
+    std::unique_ptr<monero_wallet_full> wallet( monero_wallet_full::create_wallet_from_keys (
+        wallet_file_name,
+        "pwd",
+        monero_network_type::MAINNET,
+        addr_string,
+        epee::string_tools::pod_to_hex(sec_viewkey),
+        epee::string_tools::pod_to_hex(sec_spendkey), // spend key string
+        monero_rpc_connection(            
+          host,
+          std::string(""),
+          std::string("")), 0)
+    );
+    std::cout << "sucessfully loaded wallet " << addr_string << " from spend key " << keys[i] << std::endl;
+    struct : monero_wallet_listener {
+      void on_sync_progress(uint64_t height, uint64_t start_height, uint64_t end_height, double percent_done, const std::string &message) {
+        std::cout << "height:" << height << " " << percent_done * 100 << " percent done" << std::endl;
       }
-	}
+    } listener;
+    wallet->sync(listener);
+    wallet->remove_listener(listener);
+    uint64_t balance = wallet->get_balance();
+    if (balance == 0) {
+      std::cout << "No balance found, moving on..." << std::endl;
+      continue;
+    }
+    std::cout << "balance found: " << balance  << " sweeping..." << std::endl;
+    monero_tx_config config;
+    config.m_address = rec_addr;
+    config.m_relay = true;
+    std::vector<std::shared_ptr<monero_tx_wallet>> txs = wallet->sweep_unlocked(config);
   }
-  return keys;	
+  
+  for (std::string file_name : files_created) {
+    remove(file_name.c_str()); 
+  }
+  return true;
+}
+
+void Sweeper::sweep() {
+  if (thread_count_ > 1) {
+    auto key_groups = partition_keyset(thread_count_);
+    std::vector<std::thread*> threads;
+    for (size_t i = 0; i < thread_count_; i++) {
+      std::thread worker(scan_wallets, host_, receiving_addr_, key_groups[i]);
+      threads.push_back(&worker);
+    }
+    for (std::thread* t : threads) { // wait for threads to finish
+      t->join();
+    }
+  } else {
+    scan_wallets(host_, receiving_addr_, keys_);
+  }
 }

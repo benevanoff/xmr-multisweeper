@@ -3,11 +3,7 @@
 #endif
 
 #include "catch.hpp"
-
-#include "multisweeper.hpp"
-#include "wallet2.h"
-#include "wallet/monero_wallet_full.h"
-#include "daemon/monero_daemon_model.h"
+#include "../sweeper_utils.hpp"
 
 bool test_remove_comma() {
   std::string string1 = "something,";

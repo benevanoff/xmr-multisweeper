@@ -57,6 +57,22 @@ endif()
 message(STATUS EXTRA_LIBRARIES: ${EXTRA_LIBRARIES})
 
 ############
+# Protobuf
+############
+
+include(FindProtobuf)
+find_package(Protobuf)
+message(STATUS "Protobuf lib: ${Protobuf_LIBRARY}, inc: ${Protobuf_INCLUDE_DIR}, protoc: ${Protobuf_PROTOC_EXECUTABLE}")
+include_directories(${Protobuf_INCLUDE_DIR})
+
+############
+# LibUSB
+############
+
+find_library(usb_LIBRARY NAMES usb-1.0 libusb usb)
+set(LibUSB_LIBRARIES ${usb_LIBRARY})
+
+############
 # Boost
 ############
 set(Boost_NO_BOOST_CMAKE 1)
@@ -176,8 +192,9 @@ set_target_properties(monero-cpp PROPERTIES IMPORTED_LOCATION ./libmonero-cpp.so
 set(MONERO_CPP_SRC_FILES ${MONERO_CPP}/src/utils/gen_utils.cpp ${MONERO_CPP}/src/utils/monero_utils.cpp ${MONERO_CPP}/src/daemon/monero_daemon_model.cpp ${MONERO_CPP}/src/daemon/monero_daemon.cpp ${MONERO_CPP}/src/wallet/monero_wallet_model.cpp ${MONERO_CPP}/src/wallet/monero_wallet_keys.cpp ${MONERO_CPP}/src/wallet/monero_wallet_full.cpp )
 set(MONERO_CPP_HEADER_FILES ${MONERO_CPP}/src/daemon/monero_daemon.h ${MONERO_CPP}/src/daemon/monero_daemon_model.h ${MONERO_CPP}/src/utils/gen_utils.h ${MONERO_CPP}/src/utils/monero_utils.h ${MONERO_CPP}/src/wallet/monero_wallet.h )
 
-add_library(sweeper_lib ${MONERO_CPP_SRC_FILES} ${MONERO_CPP_HEADER_FILES} multisweeper.cpp multisweeper.hpp)
-add_executable(multisweeper ${MONERO_CPP_SRC_FILES} ${MONERO_CPP_HEADER_FILES} main.cpp multisweeper.cpp multisweeper.hpp)
-target_link_libraries(multisweeper wallet_merged wallet_crypto wallet lmdb epee unbound easylogging cryptonote_core cryptonote_basic cryptonote_format_utils_basic mnemonics ringct ringct_basic common cncrypto blockchain_db blocks checkpoints device device_trezor multisig version randomx ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${SODIUM_LIBRARY} ${HIDAPI_LIBRARIES} ${EXTRA_LIBRARIES} sweeper_lib)
+add_library(sweeper_lib ${MONERO_CPP_SRC_FILES} ${MONERO_CPP_HEADER_FILES} multisweeper.cpp multisweeper.hpp sweeper_utils.hpp)
+add_executable(multisweeper ${MONERO_CPP_SRC_FILES} ${MONERO_CPP_HEADER_FILES} main.cpp multisweeper.cpp multisweeper.hpp sweeper_utils.hpp)
+target_link_libraries(multisweeper wallet_merged wallet_crypto wallet lmdb epee unbound easylogging cryptonote_core cryptonote_basic cryptonote_format_utils_basic mnemonics ringct ringct_basic common cncrypto blockchain_db blocks checkpoints device device_trezor multisig version randomx ${Boost_LIBRARIES} ${Protobuf_LIBRARY} ${LibUSB_LIBRARIES} ${OPENSSL_LIBRARIES} ${SODIUM_LIBRARY} ${HIDAPI_LIBRARIES} ${EXTRA_LIBRARIES} sweeper_lib)
 
-add_subdirectory(tests)
+add_executable(unit_tests ${MONERO_CPP_SRC_FILES} ${MONERO_CPP_HEADER_FILES} tests/unit_tests.cpp tests/catch.hpp sweeper_utils.hpp)
+target_link_libraries(unit_tests wallet_merged wallet_crypto wallet lmdb epee unbound easylogging cryptonote_core cryptonote_basic cryptonote_format_utils_basic mnemonics ringct ringct_basic common cncrypto blockchain_db blocks checkpoints device device_trezor multisig version randomx ${Boost_LIBRARIES} ${Protobuf_LIBRARY} ${LibUSB_LIBRARIES} ${OPENSSL_LIBRARIES} ${SODIUM_LIBRARY} ${HIDAPI_LIBRARIES} ${EXTRA_LIBRARIES})
